@@ -86,16 +86,49 @@ extension ViewController {
             }
         }
     }
+    
+    // MARK: - Fetch Everything
+    private func fetchEverything(_ text: String) {
+        APICaller.shared.searchArticles(with: text) { [weak self] result in
+            switch result {
+            case .success(let articles):
+                self?.articles = articles
+                self?.viewModels = articles.compactMap({
+                    NewsTableViewCellViewModel(title: $0.title,
+                                               subtitle: $0.description ?? "No Description",
+                                               imageURL: URL(string: $0.urlToImage ?? "")
+                    )
+                })
+                
+                // Refresh UI
+                DispatchQueue.main.async {
+                    self?.newsTableView.reloadData()
+                }
+                
+            case .failure(let error):
+                print(error)
+                
+            }
+        }
+    }
 }
 
-
+// MARK: - UISearchResultsUpdating
 extension ViewController: UISearchResultsUpdating {
     
     func updateSearchResults(for searchController: UISearchController) {
-        print("DEBUG:", searchController.searchBar.text)
+        guard let text = searchController.searchBar.text,
+              text.trimmingCharacters(in: .whitespacesAndNewlines).count <= 500,
+              !text.isEmpty
+        else {
+            return
+        }
+        
+        fetchEverything(text)
     }
     
 }
+
 // MARK: - UITableViewDataSource, UITableViewDelegate
 extension ViewController: UITableViewDataSource, UITableViewDelegate {
     
