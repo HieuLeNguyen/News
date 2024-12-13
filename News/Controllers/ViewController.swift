@@ -13,6 +13,7 @@ class ViewController: UIViewController {
     // MARK: - Variables
     private var viewModels = [NewsTableViewCellViewModel]()
     private var articles = [Article]()
+    private var debounceTimer: Timer?
     
     // MARK: - UI Componnets In View
     private let newsTableView: UITableView = {
@@ -53,6 +54,7 @@ class ViewController: UIViewController {
         self.searchController.obscuresBackgroundDuringPresentation = false
         self.searchController.hidesNavigationBarDuringPresentation = false
         self.searchController.searchBar.placeholder = "Search..."
+        self.searchController.searchBar.delegate = self
         
         self.navigationItem.searchController = searchController
         self.definesPresentationContext = false
@@ -89,6 +91,11 @@ extension ViewController {
     
     // MARK: - Fetch Everything
     private func fetchEverything(_ text: String) {
+        guard text.count <= 500 else {
+            print("Error: Query exceeds 500 characters.")
+            return
+        }
+        
         APICaller.shared.searchArticles(with: text) { [weak self] result in
             switch result {
             case .success(let articles):
@@ -118,13 +125,15 @@ extension ViewController: UISearchResultsUpdating {
     
     func updateSearchResults(for searchController: UISearchController) {
         guard let text = searchController.searchBar.text,
-              text.trimmingCharacters(in: .whitespacesAndNewlines).count <= 500,
-              !text.isEmpty
-        else {
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
         
-        fetchEverything(text)
+        debounceTimer?.invalidate()
+        
+        debounceTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+            self?.fetchEverything(text)
+        }
     }
     
 }
@@ -159,6 +168,18 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 150
+    }
+}
+
+// MARK: - Giới Hạn Từ Được Phép Nhập Vào
+extension ViewController: UISearchBarDelegate {
+    
+    func searchBar(_ searchBar: UISearchBar, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        let currentText = searchBar.text ?? ""
+        guard let textRange = Range(range, in: currentText) else { return false }
+        let updatedText = currentText.replacingCharacters(in: textRange, with: text)
+        
+        return updatedText.count <= 500
     }
 }
 
